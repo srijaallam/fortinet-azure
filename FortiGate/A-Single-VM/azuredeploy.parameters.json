@@ -110,6 +110,12 @@
         "subnet3Prefix": {
             "value": "172.16.137.0/24"
         },
+        "subnet4Name": {
+            "value": "ProtectedBSubnet"
+        },
+        "subnet4Prefix": {
+            "value": "172.16.138.0/24"
+        },
         "serialConsole": {
             "value": "yes"
         },

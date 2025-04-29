@@ -559,11 +559,27 @@
         "description": "Subnet 3 Name"
       }
     },
+    
     "subnet3Prefix": {
       "type": "string",
       "defaultValue": "172.16.137.0/24",
       "metadata": {
         "description": "Subnet 3 Prefix"
+      }
+    },
+    "subnet4Name": {
+      "type": "string",
+      "defaultValue": "ProtectedBSubnet",
+      "metadata": {
+        "description": "Subnet 4 Name"
+      }
+    },
+    
+    "subnet4Prefix": {
+      "type": "string",
+      "defaultValue": "172.16.138.0/24",
+      "metadata": {
+        "description": "Subnet 4 Prefix"
       }
     },
     "serialConsole": {
@@ -675,6 +691,7 @@
     "subnet1Id": "[if(equals(parameters('vnetNewOrExisting'),'new'),resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'),parameters('subnet1Name')),resourceId(parameters('vnetResourceGroup'),'Microsoft.Network/virtualNetworks/subnets', variables('vnetName'),parameters('subnet1Name')))]",
     "subnet2Id": "[if(equals(parameters('vnetNewOrExisting'),'new'),resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'),parameters('subnet2Name')),resourceId(parameters('vnetResourceGroup'),'Microsoft.Network/virtualNetworks/subnets', variables('vnetName'),parameters('subnet2Name')))]",
     "subnet3Id": "[if(equals(parameters('vnetNewOrExisting'),'new'),resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'),parameters('subnet3Name')),resourceId(parameters('vnetResourceGroup'),'Microsoft.Network/virtualNetworks/subnets', variables('vnetName'),parameters('subnet3Name')))]",
+    "subnet4Id": "[if(equals(parameters('vnetNewOrExisting'),'new'),resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'),parameters('subnet4Name')),resourceId(parameters('vnetResourceGroup'),'Microsoft.Network/virtualNetworks/subnets', variables('vnetName'),parameters('subnet4Name')))]",
     "fgtVmName": "[if(equals(parameters('fortiGateName'),''),concat(parameters('fortiGateNamePrefix'),'-fgt'),parameters('fortiGateName'))]",
     "fmgCustomData": "[if(equals(parameters('fortiManager'),'yes'),concat('\nconfig system central-management\nset type fortimanager\n set fmg ',parameters('fortiManagerIP'),'\nset serial-number ', parameters('fortiManagerSerial'), '\nend\n config system interface\n edit port1\n append allowaccess fgfm\n end\n config system interface\n edit port2\n append allowaccess fgfm\n end\n'),'')]",
     "customDataHeader": "Content-Type: multipart/mixed; boundary=\"12345\"\nMIME-Version: 1.0\n\n--12345\nContent-Type: text/plain; charset=\"us-ascii\"\nMIME-Version: 1.0\nContent-Transfer-Encoding: 7bit\nContent-Disposition: attachment; filename=\"config\"\n\n",
@@ -806,6 +823,15 @@
                 "id": "[variables('routeTableProtectedId')]"
               }
             }
+          },
+          {
+            "name": "[parameters('subnet4Name')]",
+            "properties": {
+              "addressPrefix": "[parameters('subnet4Prefix')]",
+              "routeTable": {
+                "id": "[variables('routeTableProtectedId')]"
+              }
+            }
           }
         ]
       }
@@ -831,13 +857,22 @@
             "name": "Subnet",
             "properties": {
               "addressPrefix": "[parameters('subnet3Prefix')]",
-              "nextHopType": "VnetLocal"
+              "nextHopType": "VirtualAppliance",
+              "nextHopIPAddress": "[variables('sn2IPfgt')]"
             }
           },
           {
             "name": "Default",
             "properties": {
               "addressPrefix": "0.0.0.0/0",
+              "nextHopType": "VirtualAppliance",
+              "nextHopIPAddress": "[variables('sn2IPfgt')]"
+            }
+          },
+          {
+            "name": "AtoB",
+            "properties": {
+              "addressPrefix": "172.16.138.0/24",
               "nextHopType": "VirtualAppliance",
               "nextHopIPAddress": "[variables('sn2IPfgt')]"
             }
@@ -1077,6 +1112,29 @@
       }
     },
     {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2020-06-01",
+      "name": "nic-linuxvm3",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[variables('vnetName')]",
+        "[variables('nsgId')]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('subnet4Id')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "type": "Microsoft.Compute/virtualMachines",
       "apiVersion": "2021-07-01",
       "name": "linuxvm1",
@@ -1151,6 +1209,46 @@
           "networkInterfaces": [
             {
               "id": "[resourceId('Microsoft.Network/networkInterfaces', 'nic-linuxvm2')]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2021-07-01",
+      "name": "linuxvm3",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces', 'nic-linuxvm3')]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "Standard_B1s"
+        },
+        "osProfile": {
+          "computerName": "linuxvm3",
+          "adminUsername": "[parameters('linuxVmAdminUsername')]",
+          "adminPassword": "[parameters('linuxVmAdminPassword')]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": false
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "Canonical",
+            "offer": "UbuntuServer",
+            "sku": "18.04-LTS",
+            "version": "latest"
+          },
+          "osDisk": {
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', 'nic-linuxvm3')]"
             }
           ]
         }
